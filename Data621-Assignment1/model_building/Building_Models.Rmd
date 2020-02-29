@@ -1,6 +1,6 @@
 ---
 title: 'Assignment1: Building Models'
-author: "Charls Joseph, Elina Azrilyan , Mary Anna, Vinayak.patel and Sunny Mehta"
+author: "Charls Joseph, Elina Azrilyan , Mary Anna Kivenson, Vinayak.patel and Sunny Mehta"
 date: "February 20, 2020"
 output:
   html_document: default
@@ -149,6 +149,9 @@ regressor_backward_E1 = lm(formula = WINS ~  bt_H+ bt_2B+ bt_3B+ bt_HR+ bt_BB+ b
 ```{r}
 
 summary(regressor_backward_E1)
+plot(regressor_backward_E1$residuals)
+abline(h = 0, lty = 3)
+
 par(mfrow=c(2,2))
 plot(regressor_backward_E1)
 
@@ -186,7 +189,7 @@ regressor_metrics <- rbind(regressor_metrics, c("Backward elimination-1", r2_tra
 
 
 
-## Backward Eliminaion + removal of colinear Variables 
+## Backward Elimination + removal of colinear Variables 
 
 
 Performing a VIF Test on all variables to remove some independent variables which are colinear( VIF has more than 5)
@@ -258,6 +261,8 @@ regressor_sq = lm(WINS ~ I(bt_H^2)+ I(bt_2B^2) + (br_SB^2) + (ph_BB^2) + (fd_E^2
 
 ```{r}
 summary(regressor_sq)
+plot(regressor_sq$residuals)
+abline(h = 0, lty = 3)
 par(mfrow=c(2,2))
 plot(regressor_sq)
 ```
@@ -307,6 +312,8 @@ regressor_log = lm(WINS ~  log1p(bt_H)+ log1p(bt_2B) + log1p(br_SB) + log1p(ph_B
 
 ```{r}
 summary(regressor_log)
+plot(regressor_log$residuals)
+abline(h = 0, lty = 3)
 par(mfrow=c(2,2))
 plot(regressor_log)
 ```

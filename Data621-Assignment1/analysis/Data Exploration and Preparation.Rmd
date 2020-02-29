@@ -1,6 +1,7 @@
 ---
 title: "Baseball Data - Data Exploration and Preparation"
-author: "Mary Anna Kivenson"
+author: "Mary Anna Kivenson, Charls Joseph, Elina Azrilyan , Vinayak.patel and Sunny Mehta"
+
 date: "February 15, 2020"
 output: html_document
 ---
@@ -294,11 +295,7 @@ car::vif(model1)
 ### Create Output
 
 ```{r}
-write.csv(df, "C:\\Users\\mkive\\Documents\\GitHub\\Business-Analytics-Data-Mining\\Business-Analytics-Data-Mining\\Moneyball Regression\\baseball_output.csv")
+#write.csv(df, "C:\\Users\\mkive\\Documents\\GitHub\\Business-Analytics-Data-Mining\\Business-Analytics-Data-Mining\\Moneyball Regression\\baseball_output.csv")
 ```
 
-```{r}
-df_eval <- read.csv("https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Moneyball%20Regression/moneyball-evaluation-data.csv")[-1]
-df_eval
-```
 
