@@ -1,0 +1,628 @@
+---
+title: 'Assignment1: Building Models'
+author: "Charls Joseph, Elina Azrilyan , Mary Anna, Vinayak.patel and Sunny Mehta"
+date: "February 20, 2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+
+# Multiple Linear Regression
+
+
+```{r message = FALSE }
+library(MASS)
+library(caret)
+library(car)
+library(corrplot)
+library(knitr)
+library(mice)
+```
+
+## Load the dataset
+Load the data set that was curated after the preliminary explanatory analysis.  
+
+Plotted a correlation matrix on the original data set
+
+```{r}
+df = read.csv('https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Moneyball%20Regression/baseball_output.csv')
+corrplot(cor(df, use = "complete.obs"), method="color", type="lower", tl.col = "black", tl.srt = 25)
+
+```
+
+Found that there is a data point with 0 value which needs to be corrected to a non-zero val for BOX-COX transformation later
+
+```{r}
+df[df$WINS == 0,]
+
+```
+
+Remove the index column that got added in the preliminary step. 
+Also lift each datapoints by 1 to fix the zero data point. 
+
+```{r}
+df <- subset(df, select = -c(X))
+df <- df + 1  
+```
+
+
+
+Split the data into training and test data set(80% training and 20% testing)
+
+```{r}
+# Splitting the dataset into the Training set and Test set
+# install.packages('caTools')
+library(caTools)
+set.seed(123)
+split = sample.split(df$WINS, SplitRatio = 0.8)
+training_set = subset(df, split == TRUE)
+test_set = subset(df, split == FALSE)
+
+```
+
+
+
+## Assumption of Ordinary Least square regression
+Before building and trying out different linear regression models, we will review the assumptions for the OLS algorithm to make it perform well. 
+
+1. Residual Error should be normally distributed
+2. Absence of hetroschdasticity 
+3. Absence of Colinearity 
+
+We will check these assumption/factors while reviewing the results of each model. 
+
+## Full Model 
+
+Fitting a full model with all remaining independent variables( "bt_H"  "bt_2B" "bt_3B" "bt_HR" "bt_BB" "bt_SO" "br_SB" "br_CS" "ph_H"  "ph_HR" "ph_BB" "ph_SO" "fd_E"  "fd_DP" "bt_1B" "BB") and the response variable WINS
+
+```{r}
+colnames(training_set)
+```
+
+create a dataframe for holding the regression metrics. 
+
+
+```{r}
+regressor_metrics <- data.frame(matrix(ncol = 6, nrow = 0) ,stringsAsFactors = FALSE)
+```
+
+```{r}
+# Fitting Multiple Linear Regression to the Training set
+fullregressor = lm(formula = WINS ~ . ,
+               data = training_set)
+```
+
+## Full model Stats
+
+```{r}
+
+summary(fullregressor)
+plot(fullregressor$residuals)
+abline(h = 0, lty = 3)
+
+par(mfrow=c(2,2))
+plot(fullregressor)
+
+```
+
+## Test evaluation Metrics and prediction results
+
+we see the two independent variables has p-value > 0.05. we will remove this independent variable from the model and try its performance. 
+
+since the R-square and RMSE of the model is not that great and it shows a possible underfitting problem. We will try out some transformation like backward elimination, square, logarithmic and BOX-COX transformations and review the results. 
+
+```{r}
+
+predictions = predict(fullregressor, newdata = test_set)
+head(data.frame(
+  predictions = predictions,
+  actual = test_set$WINS
+))
+rmse_test <- round(RMSE(predictions, test_set$WINS), digits=4)
+r2_test <- round(R2(predictions, test_set$WINS), digits = 4)
+adj_r2_train <- round(summary(fullregressor)$adj.r.squared, digits = 4)
+r2_train <- round(summary(fullregressor)$r.squared, digits = 4)
+rmse_train <- round(sqrt(mean(fullregressor$residuals^2)), digits = 4)
+
+data.frame(
+  rmse_test = rmse_test,
+  rmse_train = rmse_train,
+  r2_train = r2_train,
+  r2_test = r2_test,
+  adj_r2_train = adj_r2_train
+  
+)
+regressor_metrics <- rbind(regressor_metrics, c("Full-Model", r2_train , adj_r2_train, rmse_train  , rmse_test , r2_test), stringsAsFactors = FALSE)
+
+```
+
+## Backward Elimination 
+
+Through backward elimination process,  some independent variables(ph_SO,br_CS, bt_1B) that has pvalue more than the significance level of 0.05 were removed from the full model 
+
+```{r}
+regressor_backward_E1 = lm(formula = WINS ~  bt_H+ bt_2B+ bt_3B+ bt_HR+ bt_BB+ bt_SO+ br_SB+ ph_H+ ph_HR+ ph_BB + fd_E+ fd_DP+ BB ,data = training_set)
+```
+
+## Backward elimination Model Stats
+```{r}
+
+summary(regressor_backward_E1)
+par(mfrow=c(2,2))
+plot(regressor_backward_E1)
+
+```
+
+## Test evaluation Metrics and prediction results
+
+
+```{r}
+
+predictions = predict(regressor_backward_E1, newdata = test_set)
+head(data.frame(
+  predictions = predictions,
+  actual = test_set$WINS
+))
+
+rmse_test <- round(RMSE(predictions, test_set$WINS), digits=4)
+r2_test <- round(R2(predictions, test_set$WINS), digits = 4)
+adj_r2_train <- round(summary(regressor_backward_E1)$adj.r.squared, digits = 4)
+r2_train <- round(summary(regressor_backward_E1)$r.squared, digits = 4)
+rmse_train <- round(sqrt(mean(regressor_backward_E1$residuals^2)), digits = 4)
+
+data.frame(
+  rmse_test = rmse_test,
+  rmse_train = rmse_train,
+  r2_train = r2_train,
+  r2_test = r2_test,
+  adj_r2_train = adj_r2_train
+  
+)
+regressor_metrics <- rbind(regressor_metrics, c("Backward elimination-1", r2_train , adj_r2_train, rmse_train  , rmse_test , r2_test), stringsAsFactors = FALSE)
+
+```
+
+
+
+
+## Backward Eliminaion + removal of colinear Variables 
+
+
+Performing a VIF Test on all variables to remove some independent variables which are colinear( VIF has more than 5)
+
+```{r}
+model1 <- lm(WINS ~ bt_H+ bt_2B+ bt_3B+ bt_HR+ bt_BB+ bt_SO+ br_SB+ ph_H+ ph_HR+ ph_BB + fd_E+ fd_DP+ BB, data = df)
+car::vif(model1)
+
+```
+
+remove Colinear variables bt_HR + ph_HR +  BB + bt_BB.
+Also remove variables with p-value > 0.05 (bt_3B, bt_SO, ph_H)
+
+```{r}
+regressor_backward_E2 = lm(formula = WINS ~  bt_H+ bt_2B + br_SB + ph_BB + fd_E+ fd_DP  ,data = training_set)
+```
+
+## Backward elimination Model Stats( with removal of colinear variables)
+```{r}
+
+summary(regressor_backward_E2)
+plot(regressor_backward_E2$residuals)
+abline(h = 0, lty = 3)
+
+par(mfrow=c(2,2))
+plot(regressor_backward_E2)
+
+```
+
+```{r}
+
+predictions = predict(regressor_backward_E2, newdata = test_set)
+head(data.frame(
+  predictions = predictions,
+  actual = test_set$WINS
+))
+
+rmse_test <- round(RMSE(predictions, test_set$WINS), digits=4)
+r2_test <- round(R2(predictions, test_set$WINS), digits = 4)
+adj_r2_train <- round(summary(regressor_backward_E2)$adj.r.squared, digits = 4)
+r2_train <- round(summary(regressor_backward_E2)$r.squared, digits = 4)
+rmse_train <- round(sqrt(mean(regressor_backward_E2$residuals^2)), digits = 4)
+
+data.frame(
+  rmse_test = rmse_test,
+  rmse_train = rmse_train,
+  r2_train = r2_train,
+  r2_test = r2_test,
+  adj_r2_train = adj_r2_train
+  
+)
+regressor_metrics <- rbind(regressor_metrics, c("Backward elimination-2", r2_train , adj_r2_train, rmse_train  , rmse_test , r2_test), stringsAsFactors = FALSE)
+```
+
+
+## Square transformation Model
+
+
+
+```{r}
+# Fitting Multiple Linear Regression to the Training set
+#"bt_H"  "bt_2B" "bt_3B" "br_SB" "br_CS" "ph_H"  "fd_E"  "fd_DP"
+regressor_sq = lm(WINS ~ I(bt_H^2)+ I(bt_2B^2) + (br_SB^2) + (ph_BB^2) + (fd_E^2)+ (fd_DP^2) ,
+               data = training_set)
+```
+
+## Square transformation Model Stats
+
+
+```{r}
+summary(regressor_sq)
+par(mfrow=c(2,2))
+plot(regressor_sq)
+```
+
+## Test evaluation Metrics and prediction results
+
+RMSE(test) has improved, but R-square is reduced slightly. 
+
+```{r}
+
+
+predictions = predict(regressor_sq, newdata = test_set)
+head(data.frame(
+  predictions = predictions,
+  actual = test_set$WINS
+))
+
+rmse_test <- round(RMSE(predictions, test_set$WINS), digits=4)
+r2_test <- round(R2(predictions, test_set$WINS), digits = 4)
+adj_r2_train <- round(summary(regressor_sq)$adj.r.squared, digits = 4)
+r2_train <- round(summary(regressor_sq)$r.squared, digits = 4)
+rmse_train <- round(sqrt(mean(regressor_sq$residuals^2)), digits = 4)
+
+data.frame(
+  rmse_test = rmse_test,
+  rmse_train = rmse_train,
+  r2_train = r2_train,
+  r2_test = r2_test,
+  adj_r2_train = adj_r2_train
+  
+)
+regressor_metrics <- rbind(regressor_metrics, c("Square Transformation", r2_train , adj_r2_train, rmse_train  , rmse_test , r2_test), stringsAsFactors = FALSE)
+
+```
+
+
+## Logarithmic transformation 
+```{r}
+# Fitting Multiple Linear Regresion to the Training set
+regressor_log = lm(WINS ~  log1p(bt_H)+ log1p(bt_2B) + log1p(br_SB) + log1p(ph_BB) + log1p(fd_E)+ log1p(fd_DP),
+               data = training_set)
+
+```
+
+## Logarithmic transformation Stats
+
+
+```{r}
+summary(regressor_log)
+par(mfrow=c(2,2))
+plot(regressor_log)
+```
+
+## Test evaluation Metrics and prediction results
+
+Residual Error plot developed a slight cure and OLS assumptions are not met. 
+
+```{r}
+
+
+predictions = predict(regressor_log, newdata = test_set)
+head(data.frame(
+  predictions = predictions,
+  actual = test_set$WINS
+))
+
+rmse_test <- round(RMSE(predictions, test_set$WINS), digits=4)
+r2_test <- round(R2(predictions, test_set$WINS), digits = 4)
+adj_r2_train <- round(summary(regressor_log)$adj.r.squared, digits = 4)
+r2_train <- round(summary(regressor_log)$r.squared, digits = 4)
+rmse_train <- round(sqrt(mean(regressor_log$residuals^2)), digits = 4)
+
+data.frame(
+  rmse_test = rmse_test,
+  rmse_train = rmse_train,
+  r2_train = r2_train,
+  r2_test = r2_test,
+  adj_r2_train = adj_r2_train
+  
+)
+regressor_metrics <- rbind(regressor_metrics, c("Log Transformation", r2_train , adj_r2_train, rmse_train  , rmse_test , r2_test), stringsAsFactors = FALSE)
+
+```
+## box cox transformation 
+
+Trying out a box-cox transformation. Used the best model so far which is backward elimination model to apply BOX-COX transformation. Lambda comes close to 1. So it doesnt make any difference and there is no need to apply the BOX-COX tranformation. 
+
+```{r}
+
+bc = boxcox(regressor_backward_E2)
+```
+
+
+## Cross validation 
+
+Performing a cross validation algorithm if it make some improvement. 
+
+```{r results="hide"}
+library(caret)
+set.seed(123)
+
+regression_cv <- train(
+  WINS ~ bt_H+ bt_2B + br_SB + ph_BB + fd_E+ fd_DP , training_set,
+  method = "lm",
+  trControl = trainControl(
+    method = "cv", 
+    number =10,
+    verboseIter = TRUE
+  )
+)
+
+```
+
+```{r}
+summary(regression_cv)
+
+```
+
+```{r}
+
+predictions = predict(regression_cv, newdata = test_set)
+head(data.frame(
+  predictions = predictions,
+  actual = test_set$WINS
+))
+
+rmse_test <- round(RMSE(predictions, test_set$WINS), digits=4)
+r2_test <- round(R2(predictions, test_set$WINS), digits = 4)
+adj_r2_train <- round(summary(regression_cv)$adj.r.squared, digits = 4)
+r2_train <- round(summary(regression_cv)$r.squared, digits = 4)
+rmse_train <- round(sqrt(mean(regression_cv$residuals^2)), digits = 4)
+
+data.frame(
+  rmse_test = rmse_test,
+  rmse_train = rmse_train,
+  r2_train = r2_train,
+  r2_test = r2_test,
+  adj_r2_train = adj_r2_train
+  
+)
+regressor_metrics <- rbind(regressor_metrics, c("Cross Validation", r2_train , adj_r2_train, rmse_train  , rmse_test , r2_test), stringsAsFactors = FALSE)
+
+metrics <- c("regressor", "Rsquare(Train-set)", "Adjusted-RSquare(Training-set)","RMSE(Train-set)" ,  "RMSE(Test-set)", "R-Square(Test)")
+colnames(regressor_metrics) <- metrics
+kable(regressor_metrics)
+```
+
+
+## Summary of findings
+
+1. Model built using Backward Elimination-2 and Square transformation looks to be the best among all models considering comparetively low RMSE(test) and comparetively good R-square values. 
+
+2. Less R^2 and high RMSE shows an underfitting problem. The dataset doesnt follow a linear relationship with the response variable. None of the transformation helped improving the metrics. 
+
+3. Although the model exhibits an underfitting problem, it slightly met the ordinary least square assumptions.
+  a. Residuals doesnt have high variance. 
+  b. Residual QQ plots gives a slight straight line. 
+  
+4. Residual Error plot developed a slight cure and OLS assumptions are not met.
+
+5. Metrics shows RMSE(Train) and RMSE(TEST) is almost same and dont have much differences. But the R^2 has some difference for all the models. We will see some overfitting solution and check the model gets improved further in next step. 
+
+## Does overfitting exist ? 
+
+RMSE(train) and RMSE(test) doesnt indicate there is a problem of overfitting, but R^2 has some difference. We want to see if the model gets improved using some of the underfitting solutions. 
+
+
+## Ridge Regression
+
+Lets try out the ridge regression with cross validation.
+
+```{r}
+library(glmnet)
+
+lambda <- 10^seq(-3, 3, length = 100)
+
+# Build the model
+set.seed(123)
+ridge <- train(
+  WINS ~ bt_H+ bt_2B + br_SB + ph_BB + fd_E+ fd_DP , data = training_set, method = "glmnet",
+  trControl = trainControl("cv", number = 10),
+  tuneGrid = expand.grid(alpha = 0, lambda = lambda)
+  )
+# Model coefficients
+coef(ridge$finalModel, ridge$bestTune$lambda)
+
+```
+
+R^2(test) and RMSE doesn't get improved 
+
+```{r}
+# Make predictions
+predictions <- predict(ridge, test_set)
+# Model prediction performance
+head(data.frame(
+  predictions = predictions,
+  actual = test_set$WINS
+))
+
+data.frame(
+  RMSE = RMSE(predictions, test_set$WINS),
+  Rsquare = R2(predictions, test_set$WINS)
+)
+```
+
+#lassso 
+Lets try out the Lasso regression with cross validation.
+
+
+```{r}
+# Build the model
+set.seed(123)
+lasso <- train(
+  WINS ~ bt_H+ bt_2B + br_SB + ph_BB + fd_E+ fd_DP , data = training_set, method = "glmnet",
+  trControl = trainControl("cv", number = 10),
+  tuneGrid = expand.grid(alpha = 1, lambda = lambda)
+  )
+# Model coefficients
+coef(lasso$finalModel, lasso$bestTune$lambda)
+
+```
+
+R^2 and RMSE doesn't get improved 
+
+
+```{r}
+# Make predictions
+predictions <-  predict(lasso, test_set)
+# Model prediction performance
+data.frame(
+  RMSE = RMSE(predictions, test_set$WINS),
+  Rsquare = R2(predictions, test_set$WINS)
+)
+
+```
+
+# Elastic net 
+
+Lets try out the Elastic net regression with cross validation.
+
+
+```{r}
+# Build the model
+set.seed(123)
+elastic <- train(
+  WINS  ~bt_H+ bt_2B + br_SB + ph_BB + fd_E+ fd_DP , data = training_set, method = "glmnet",
+  trControl = trainControl("cv", number = 10),
+  tuneLength = 10
+  )
+# Model coefficients
+coef(elastic$finalModel, elastic$bestTune$lambda)
+
+```
+R^2 and RMSE doesn't get improved 
+
+
+```{r}
+# Make predictions
+predictions <- predict(elastic, test_set)
+# Model prediction performance
+head(data.frame(
+  predictions = predictions,
+  actual = test_set$WINS
+))
+
+data.frame(
+  RMSE = RMSE(predictions, test_set$WINS),
+  Rsquare = R2(predictions, test_set$WINS)
+)
+
+```
+
+overfitting Solution didnt take any effect, so there is no improvement to the best model we identified above. 
+
+
+## Prediction of evaluation data set
+
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+imputeMissingData <- function(df) {
+  tempData = mice(df,m=5,maxit=50,meth='pmm',seed=500)
+  df <- complete(tempData,1)
+  df
+
+}
+```
+
+```{r message=FALSE, warning=FALSE}
+
+trimColumn <- function(df) {
+  names(df) <- sub("TEAM_", "", names(df))
+names(df) <- sub("BATTING_", "bt_", names(df))
+names(df) <- sub("BASERUN_", "br_", names(df))
+names(df) <- sub("FIELDING_", "fd_", names(df))
+names(df) <- sub("PITCHING_", "ph_", names(df))
+names(df) <- sub("TARGET_", "", names(df))
+head(df)
+df
+}
+
+LoadandpreprocessEvaluationSet <- function () {
+  # load training set 
+  df_train <- read.csv("https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Moneyball%20Regression/moneyball-training-data.csv")[-1]
+  # trim the column name and drop the response variable from training set 
+  df_train <- trimColumn(df_train)
+  #drop the response variable from training set. we have to combine it with the evaluation data set and needs have same columns. 
+  
+  df_train <- subset(df_train , select = -c(WINS))
+
+  #create a new column to indidcate it is training set or evaluation set
+  df_train$type = 0
+  # seprate out the evaluation set and return 
+  df_eval <- read.csv("https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Moneyball%20Regression/moneyball-evaluation-data.csv")[-1]
+  #trim the evaluation columns 
+  df_eval <- trimColumn(df_eval)
+
+  #create a new column to indidcate it is training set or evaluation set, Set to 1
+  df_eval$type =1
+  # combine training and evaluation in one df and apply the required tranformation for missing data 
+  df_full <- rbind(df_train, df_eval)
+  df_full$bt_1B <- df_full$bt_H - df_full$bt_2B - df_full$bt_3B - df_full$bt_HR
+  df_full$BB <- df_full$bt_BB / df_full$ph_BB
+
+  # transform the missing data using impute function
+  df_full <- imputeMissingData(df_full)
+  #filter only the evaluation set
+  df_eval <- df_full[df_full$type == 1, ]
+  #return the evaluation set 
+  df_eval
+}
+```
+
+```{r results="hide" }
+df_eval <- LoadandpreprocessEvaluationSet()
+```
+
+
+
+```{r}
+df_eval<- subset(df_eval , select = -c(type))
+#lift the data points by 1 to fix the zero data points( did the same transformation for training set while building the model)
+
+df_eval<-df_eval + 1
+eval_data <- read.csv("https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Moneyball%20Regression/moneyball-evaluation-data.csv")
+
+```
+
+## Evaluating using Square transformation model
+
+```{r}
+predictions = predict(regressor_sq, newdata = df_eval)
+eval_data$WINS <- ceiling(predictions- 1) 
+kable(eval_data[, c("INDEX", "WINS")])
+```
+
+## Evaluating using Backward elimination model 
+
+```{r}
+predictions = predict(regressor_backward_E2, newdata = df_eval)
+eval_data$WINS <- ceiling(predictions- 1) 
+kable(eval_data[, c("INDEX", "WINS")])
+
+
+```
+
+
+
+
