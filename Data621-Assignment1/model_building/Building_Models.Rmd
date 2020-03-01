@@ -417,13 +417,13 @@ kable(regressor_metrics)
 
 1. Model built using Backward Elimination-2 and Square transformation looks to be the best among all models considering comparetively low RMSE(test) and comparetively good R-square values. 
 
-2. Less R^2 and high RMSE shows an underfitting problem. The dataset doesnt follow a linear relationship with the response variable. None of the transformation helped improving the metrics. 
+2. Less R^2 and high RMSE shows an underfitting problem. The dataset doesnt follow a linear relationship with the response variable. 
 
 3. Although the model exhibits an underfitting problem, it slightly met the ordinary least square assumptions.
   a. Residuals doesnt have high variance. 
   b. Residual QQ plots gives a slight straight line. 
   
-4. Residual Error plot developed a slight cure and OLS assumptions are not met.
+4. Residual Error plot shows a slight cure and OLS assumptions are not met.
 
 5. Metrics shows RMSE(Train) and RMSE(TEST) is almost same and dont have much differences. But the R^2 has some difference for all the models. We will see some overfitting solution and check the model gets improved further in next step. 
 
