@@ -1,0 +1,5 @@
+TYPE1, TYPE2 ERROR, FPR, FNR, PRECISION, RECALL
+https://www.youtube.com/watch?v=aWAnNHXIKww&t=997s
+
+ROC and AUC curve 
+https://www.youtube.com/watch?v=A_ZKMsZ3f3o
