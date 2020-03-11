@@ -1,6 +1,6 @@
 ---
 title: 'Assignment1: Building Models'
-author: "Charls Joseph, Elina Azrilyan , Mary Anna Kivenson, Vinayak.patel and Sunny Mehta"
+author: "Charls Joseph"
 date: "February 20, 2020"
 output:
   html_document: default

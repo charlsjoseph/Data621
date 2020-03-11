@@ -1,0 +1,230 @@
+---
+title: "DATA 621 – Business Analytics and Data Mining"
+output: html_document
+---
+
+####Homework #2
+#####Critical Thinking Group 2
+#####Elina Azrilyan
+#####March 8th, 2020
+
+
+####Step 1. 
+
+Download the classification output data set.
+
+```{r}
+df <- read.csv("https://raw.githubusercontent.com/che10vek/Data621/master/classification-output-data.csv")
+head(df,10)
+```
+
+####Step 2. 
+
+The data set has three key columns we will use:
+- class: the actual class for the observation
+- scored.class: the predicted class for the observation (based on a threshold of 0.5)
+- scored.probability: the predicted probability of success for the observation
+
+Use the table() function to get the raw confusion matrix for this scored dataset. Make sure you understand the output. In particular, do the rows represent the actual or predicted class? The columns?
+
+```{r}
+cmtable<-table(df$class, df$scored.class)
+cmtable
+```
+
+Interpreting the output of this Confusion Matrix: The rows represent Actual Values, and the columns respesent Predicted Values. Let's rename the rows and columns to to make it clearer.
+
+```{r}
+colnames(cmtable) <- c("Predicted No", "Predicted Yes")
+rownames(cmtable) <- c("Actual No", "Actual Yes")
+cmtable
+```
+
+####Step 3. 
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the accuracy of the predictions.
+
+```{r}
+get_accuracy <- function(actual, predicted)
+{
+  cmtable <- as.matrix(table(predicted, actual))
+  TN <- cmtable[1,1]
+  FN <- cmtable[1,2]
+  FP <- cmtable[2,1]
+  TP <- cmtable[2,2]
+  return ((TP + TN) / (TN + FN + TP + FP))
+}
+get_accuracy(df$class, df$scored.class)
+```
+
+####Step 4. 
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the classification error rate of the predictions.
+
+```{r}
+get_class_err_rate <- function(actual, predicted)
+{
+  cmtable <- as.matrix(table(predicted, actual))
+  TN <- cmtable[1,1]
+  FN <- cmtable[1,2]
+  FP <- cmtable[2,1]
+  TP <- cmtable[2,2]
+  return ((FP + FN) / (TN + FN + TP + FP))
+}
+get_class_err_rate(df$class, df$scored.class)
+```
+
+Verify that you get an accuracy and an error rate that sums to one.
+
+Note: Accuracy is used when the dataset is balanced. It means the dataset has equal number of classes. 
+if the dataset is imbalanced, we have to use other metrics like precision, recall and f1 score. 
+
+```{r}
+get_accuracy(df$class, df$scored.class) + get_class_err_rate(df$class, df$scored.class)
+```
+
+####Step 5. 
+Question 5 - Precision
+
+$Precision = \frac{TP}{TP + FP}$
+
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the precision of the predictions.
+
+Note: False positive rate of the  classifer is otherwise called Type-1 Error. 
+
+$False Positive Rate = \frac{FP}{FP + TN}$
+
+E.g of type1 error: Suppose a spam detection model predicted as spam, but in reality it is not. The impact of such event is customer is going to miss the email.
+
+In such use cases, we should focus on reducing false positive rate and we use the metric Precision to measure this. For precision, the more closer to 1, the better would be the tolerance of the classifer towards the false positive rate. 
+
+
+```{r}
+get_precision <- function(actual, predicted){
+  cm <- as.matrix.data.frame(table(predicted, actual))
+  TN <- cm[1,1]
+  FN <- cm[1,2]
+  FP <- cm[2,1]
+  TP <- cm[2,2]
+  return (TP / (TP + FP))
+}
+prec<- get_precision(df$class, df$scored.class)
+
+```
+
+
+####Step 6. 
+Question 6 - Sensitivity (Recall)
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.
+
+$Sensitivity = \frac{TP}{TP + FN}$
+
+Note: Sensitivity/Recall indicate the False negative rate of the classifer which is otherwise called Type-2 error. 
+
+e.g of type2 error: 
+$False Negative Rate = \frac{FN}{FN + TP}$
+
+E.g of type1 error: A person has a cancer in reality, but the model predicted as false. The impact of such event is bad and patient will die without the treatment.  
+
+In such use cases, we should focus on reducing false negative rate and we use the metric Recall or Sensitivityto measure this. For Sensitivity, the more closer to 1, the better would be the tolerance of the classifer towards the false Negative rate.
+
+The goal is to reduce both Type1 and Type2 error. Hence we have another metric called "F-beta" Score to combine both of these metrics. beta is value chosen depends on tolerance of how much False positive and False negative rate is allowed. 
+
+F1 Score is calculated when beta is 1. 
+
+```{r}
+get_sensitivity <- function(actual, predicted){
+  cm <- as.matrix.data.frame(table(predicted, actual))
+  TN <- cm[1,1]
+  FN <- cm[1,2]
+  FP <- cm[2,1]
+  TP <- cm[2,2]
+  return (TP / (TP + FN))
+}
+recall <- get_sensitivity(df$class, df$scored.class)
+
+```
+
+
+
+####Step 7. 
+Question 7 - Specficity 
+
+$Specficity = \frac{TN}{TN + FP}$
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the specificity of the predictions.
+
+```{r}
+get_specficity <- function(actual, predicted){
+  cm <- as.matrix.data.frame(table(predicted, actual))
+  TN <- cm[1,1]
+  FN <- cm[1,2]
+  FP <- cm[2,1]
+  TP <- cm[2,2]
+  return (TN / (TN + FP))
+}
+get_specficity(df$class, df$scored.class)
+
+```
+
+####Step 8. 
+
+Question 8 - F1 Score 
+
+$F1Score = \frac{2* precision * Sensitivity}{precision + Sensitivity}$
+
+Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the F1 score of the predictions.
+
+
+```{r}
+get_f1score <- function(prec, recall){
+  
+  return (2* prec * recall/ (prec + recall))
+}
+get_f1score(prec, recall)
+
+```
+
+####Step 9
+
+Question 9:
+
+Before we move on, let's consider a question that was asked: What are the bounds on the F1 score? Show that the F1 score will always be between 0 and 1.
+
+As we know, there are 2 types of Error. They are type-1 and type-2
+
+Type-1 errors are False positive which will be dealt with the metric Precision. 
+
+$Precision = \frac{TP}{TP + FP}$
+
+Type-2 errors are False negative which will be dealt with the metric Recall or sensitivity. 
+
+$Sensitivity = \frac{TP}{TP + FN}$
+
+Our goal is reduce the Type-1 and Type-2 errors. 
+
+When FP is 0, we have precision is equal to 1. 
+
+when FN is 0, we have recall is equal to 1
+
+Therefore,  the maximum value of precision is equal to 1. 
+
+When TP =0, we dont have any True positive cases and the precision and recall would be 0.
+
+Therefore, the minimum value of recall is equal to 0. 
+
+$F1Minimum = \frac{2* 0 * 0}{0 + 0}$ = 0 
+
+$F1Maximum = \frac{2* 1 * 1}{1 + 1}$ = 1 
+
+
+hence the f1_score ranges from 0 to 1. 
+
+
+####Step 10
+
+Question 10:
+Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals
+
+
+
+
