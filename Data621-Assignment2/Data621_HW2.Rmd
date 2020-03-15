@@ -1,29 +1,53 @@
 ---
-title: "DATA 621 – Business Analytics and Data Mining"
-output: html_document
+title: "DATA 621 - Business Analytics and Data Mining"
+author: "C.Joseph"
+date: "`r Sys.Date()`"
+subtitle: 'Homework 2: Critical Thinking Group 2'
+output:
+  html_document:
+    code_folding: hide
+    df_print: paged
+    highlight: tango
+    theme: united
+  word_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
 ---
 
-####Homework #2
-#####Critical Thinking Group 2
-#####Elina Azrilyan
-#####March 8th, 2020
+```{r, include=FALSE}
+options(tinytex.verbose = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+## load library
+if (!require("ggplot2")) install.packages("ggplot2")
+if (!require("caret")) install.packages("caret") 
+if (!require("knitr")) install.packages("knitr")
+if (!require("pROC")) install.packages("pROC") #missing data
+
+knitr::opts_chunk$set(echo = TRUE)
+options("scipen" = 10)
 
 
-####Step 1. 
+```
+
+## Step 1. 
 
 Download the classification output data set.
 
 ```{r}
 df <- read.csv("https://raw.githubusercontent.com/che10vek/Data621/master/classification-output-data.csv")
-head(df,10)
+kable(head(df,10), booktabs = T)
 ```
 
-####Step 2. 
+## Step 2. 
 
-The data set has three key columns we will use:
-- class: the actual class for the observation
-- scored.class: the predicted class for the observation (based on a threshold of 0.5)
-- scored.probability: the predicted probability of success for the observation
+The data set has three key columns we will use:  
+
+* class: the actual class for the observation  
+* scored.class: the predicted class for the observation (based on a threshold of 0.5)  
+* scored.probability: the predicted probability of success for the observation  
 
 Use the table() function to get the raw confusion matrix for this scored dataset. Make sure you understand the output. In particular, do the rows represent the actual or predicted class? The columns?
 
@@ -37,13 +61,14 @@ Interpreting the output of this Confusion Matrix: The rows represent Actual Valu
 ```{r}
 colnames(cmtable) <- c("Predicted No", "Predicted Yes")
 rownames(cmtable) <- c("Actual No", "Actual Yes")
-cmtable
+kable(cmtable, booktabs = T)
 ```
 
-####Step 3. 
+## Step 3. 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the accuracy of the predictions.
 
 ```{r}
+
 get_accuracy <- function(actual, predicted)
 {
   cmtable <- as.matrix(table(predicted, actual))
@@ -56,7 +81,7 @@ get_accuracy <- function(actual, predicted)
 get_accuracy(df$class, df$scored.class)
 ```
 
-####Step 4. 
+## Step 4. 
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the classification error rate of the predictions.
 
 ```{r}
@@ -81,7 +106,7 @@ if the dataset is imbalanced, we have to use other metrics like precision, recal
 get_accuracy(df$class, df$scored.class) + get_class_err_rate(df$class, df$scored.class)
 ```
 
-####Step 5. 
+## Step 5. 
 Question 5 - Precision
 
 $Precision = \frac{TP}{TP + FP}$
@@ -108,11 +133,11 @@ get_precision <- function(actual, predicted){
   return (TP / (TP + FP))
 }
 prec<- get_precision(df$class, df$scored.class)
-
+prec
 ```
 
 
-####Step 6. 
+## Step 6. 
 Question 6 - Sensitivity (Recall)
 Write a function that takes the data set as a dataframe, with actual and predicted classifications identified, and returns the sensitivity of the predictions. Sensitivity is also known as recall.
 
@@ -140,13 +165,15 @@ get_sensitivity <- function(actual, predicted){
   TP <- cm[2,2]
   return (TP / (TP + FN))
 }
+
 recall <- get_sensitivity(df$class, df$scored.class)
+recall
 
 ```
 
 
 
-####Step 7. 
+## Step 7. 
 Question 7 - Specficity 
 
 $Specficity = \frac{TN}{TN + FP}$
@@ -162,11 +189,12 @@ get_specficity <- function(actual, predicted){
   TP <- cm[2,2]
   return (TN / (TN + FP))
 }
+
 get_specficity(df$class, df$scored.class)
 
 ```
 
-####Step 8. 
+## Step 8. 
 
 Question 8 - F1 Score 
 
@@ -177,14 +205,14 @@ Write a function that takes the data set as a dataframe, with actual and predict
 
 ```{r}
 get_f1score <- function(prec, recall){
-  
   return (2* prec * recall/ (prec + recall))
 }
+
 get_f1score(prec, recall)
 
 ```
 
-####Step 9
+## Step 9
 
 Question 9:
 
@@ -220,11 +248,105 @@ $F1Maximum = \frac{2* 1 * 1}{1 + 1}$ = 1
 hence the f1_score ranges from 0 to 1. 
 
 
-####Step 10
+## Step 10
 
 Question 10:
 Write a function that generates an ROC curve from a data set with a true classification column (class in our example) and a probability column (scored.probability in our example). Your function should return a list that includes the plot of the ROC curve and a vector that contains the calculated area under the curve (AUC). Note that I recommend using a sequence of thresholds ranging from 0 to 1 at 0.01 intervals
 
 
+```{r fig1, fig.height = 5, fig.width = 5, fig.align= 'center', warning=FALSE}
+library(ggplot2)
+#ROC Curve
+my_curve <- function(data) {
+  thresholds <- seq(0, 1, by=0.01)
+  X <- c()
+  Y <- c()
+  
+  for (i in 1:length(thresholds)){
+    scored_class <- ifelse(data$scored.probability >= thresholds[i], 1, 0)
+    cur_df <- data.frame(scored.class = scored_class, class = data$class)
+    df_table <- with(cur_df, table(scored.class, class))
+    X[i] <- (df_table[4])/(df_table[4] + df_table[3])
+    Y[i]<- (df_table[2]/(df_table[2] + df_table[1]))
+  }
+  
+  plot_df <- data.frame(TRUE_POSITIVE = X, FALSE_POSITIVE = Y)  
+  # In order to roughly calculate the area under the curve, we must remove the NA values
+  plot_df <- na.omit(plot_df)
+  
+  ROC_plot <- ggplot(plot_df, aes(x=FALSE_POSITIVE, y=TRUE_POSITIVE)) + 
+    geom_line(col=rgb(0.2,0.4,0.1,0.7) , lwd=1) + 
+    geom_abline(intercept = 0, slope = 1) + 
+    labs(title="ROC Plot", x = "False Positive Rate", y = "True Positive Rate")
+  
+  # Now to calculate the AUC 
+  x <- abs(diff(plot_df$FALSE_POSITIVE))
+  y <- plot_df$TRUE_POSITIVE
+  
+  area_under_curve <- sum(x*y)
+  
+  ROC_plot2 <- ggplot(plot_df, aes(x=FALSE_POSITIVE, y=TRUE_POSITIVE)) + 
+    ggtitle('ROC Curve') +
+    geom_line(col="blue") + 
+    geom_abline(intercept = 0, slope = 1) + 
+    geom_point() +
+    xlab('False Positive Rate') + 
+    ylab('True Positive Rate')
 
+  return(list(ROC_plot, area_under_curve))
+}
+
+result = my_curve(df)
+ROC_plot <-result[[1]]
+ROC_curve <-result[[2]]
+
+result
+```
+## Step 11. 
+
+Use your created R functions and the provided classification output data set to produce all of the classification metrics discussed above.
+
+```{r}
+my_Classification <- data.frame('Accuracy' = get_accuracy(df$class, df$scored.class), 
+                   'Error rate' = get_class_err_rate(df$class, df$scored.class),
+                   'Precision' = get_precision(df$class, df$scored.class),
+                   'Sensitivity' = get_sensitivity(df$class, df$scored.class),
+                   'Specficity' = get_specficity(df$class, df$scored.class),
+                   'F_Score' = get_f1score(prec, recall)
+                   )
+
+
+kable(my_Classification, booktabs = T)
+```
+
+## Step 12. 
+
+Investigate the caret package. In particular, consider the functions confusionMatrix, sensitivity, and specificity. Apply the functions to the data set.
+
+Note: the functions from the caret package ask for the Predicted values to be formatted as rows and the True Positives to be in the top left cell of the table. So we re-factor our variables before passing them into the functions.
+
+```{r}
+truth <- factor(df$class)
+levels(truth) = list("Yes" = 1, "No" = 0)
+pred <- factor(df$scored.class)
+levels(pred) = list("Yes" = 1, "No" = 0)
+
+confusionMatrix(pred, truth)
+sensitivity(pred, truth)
+specificity(pred, truth)
+```
+
+We can see above that the caret functions give the same results as our manually created functions.
+
+
+## Step 13. 
+Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?
+
+```{r}
+roc_obj <- roc(df$class, df$scored.probability, quiet = T)
+plot(roc_obj)
+print(roc_obj)
+```
+
+We can see the pROC results are very similar to our manually created functions.
 
