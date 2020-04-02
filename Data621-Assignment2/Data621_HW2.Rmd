@@ -343,10 +343,20 @@ We can see above that the caret functions give the same results as our manually 
 Investigate the pROC package. Use it to generate an ROC curve for the data set. How do the results compare with your own functions?
 
 ```{r}
-roc_obj <- roc(df$class, df$scored.probability, quiet = T)
-plot(roc_obj)
+head(df)
+roc_obj <- roc(df$class, df$scored.probability)
+plot(roc_obj, colorize=TRUE)
 print(roc_obj)
 ```
 
 We can see the pROC results are very similar to our manually created functions.
 
+```{r}
+
+#install.packages("ROCR")     
+library(ROCR)
+pred <- prediction(df$scored.probability,df$class)
+roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
+plot(roc.perf, colorize=TRUE , print.cutoffs.at=seq(0,1,0.05), text.adj=c(-.2,1))
+
+```

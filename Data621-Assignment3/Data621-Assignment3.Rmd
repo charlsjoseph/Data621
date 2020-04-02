@@ -1,0 +1,240 @@
+---
+title: "Crime Classification - Binary Classification"
+date: "March 29, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(ggplot2)
+require(gridExtra)
+library(car)
+library(factoextra)
+library(dplyr)
+library(DT)
+library(knitr)
+```
+
+# Data Exploration
+
+
+```{r}
+df <- read.csv("https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Classification%20Project/crime-training-data_modified.csv")
+datatable(df)
+```
+
+#### Summary
+
+First, we take a look at a summary of the data. A few items of interest are revealed:
+
+* There are no missing values in the dataset
+* There are no immediately apparent outliers
+* Expected clusters are of similar size (237 and 229). This is a necessary assumption for algorithms such as K-Means clustering.
+
+```{r}
+summary(df)
+```
+
+
+
+#### Boxplots
+
+Next, we create boxplots of each of the features - color coded by the target variable. These boxplots reveal significant information about the predictor variables
+
+* The `chas` dummy variable has most of its values at 0
+* indus, zn, nox, age, dis, rad, tax, ptratio, lstat, and medv seem to have strong affects on the target variable  
+
+```{r warning=FALSE, fig.width= 10}
+grid.arrange(ggplot(df, aes(x = as.factor(target), y = zn, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = indus, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = chas, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = nox, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = rm, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = age, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = dis, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = rad, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = tax, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = ptratio, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = lstat, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = as.factor(target), y = medv, fill = as.factor(target))) + geom_boxplot() + theme(legend.position = "none") ,
+             ncol=4)
+```
+
+
+
+#### PCA Component Visualization
+
+PCA can be used for classification, but for now, it will be used to visualize the clusters. First, the number of components will be selected based on the variances explained by each component.
+
+Taking a look at the plot of percentages explained by each principal component, it seems like most of the variance can be explained by 2 principal components. 
+
+
+```{r}
+df.pca <- prcomp(df[1:12], center = TRUE, scale. = TRUE)
+fviz_eig(df.pca)
+```
+
+
+Using these two principal components, a scatterplot of the clusters can be created. Having two principal components makes it easier to distinguish between the two clusters, though there is some overlap.
+
+```{r}
+fviz_pca_ind(df.pca,
+             col.ind = as.factor(df$target), # Color by the quality of representation
+             palette = c("#00AFBB",  "#FC4E07"),
+             addEllipses = TRUE, 
+             legend.title = "Target",
+             labels = FALSE
+             )
+```
+
+
+
+
+
+# Data Preparation
+
+Since the dataset does not have any missing values and there are no outliers that particulary stand out, data preparation will be limited. However, we will locate and address any influential outliers using Cooks Distance. Outliers that have a Cooks distance outside the acceptable threshold of 4 / (N - k - 1) where N is the number of observations and k is the number of predictive variables, will be removed. 
+
+#### Cooks Distance
+
+```{r}
+mod <- lm(target ~ ., data=df)
+cooksd <- cooks.distance(mod)
+plot(cooksd, pch="*", cex=2, main="Influential Outliers by Cooks distance")
+abline(h = 4 / (nrow(df) - ncol(df) - 1), col="red")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="red")  # add labels
+```
+
+
+We remove the influencial outliers. Removing these outliers also makes the two primary components (visualized in the previous step) explain more of the variance in the data.
+
+```{r}
+influential <- as.numeric(names(cooksd)[(cooksd > 4 / (nrow(df) - ncol(df) - 1))])
+df <- df[-influential, ]
+```
+
+## Building logistic regression
+
+We will build a logistic classifer using generlized linear regresson with binomaial distribution. 
+
+Lets evaluate the distribution of target class label and check whether the dataset is imbalanced or not. 
+
+```{r}
+table(df$target)
+
+```
+
+we see that both label 0 and label 1 is balanced and have nearly equal number of datapoints. 
+
+Now lets split the given data set into 80% of training data and 20% testing data.
+And build logistic classifer with the training set 
+
+```{r}
+library(caTools)
+library(pROC)
+library(caret)
+set.seed(123)
+split = sample.split(df$target, SplitRatio = 0.8)
+training_set = subset(df, split == TRUE)
+test_set = subset(df, split == FALSE)
+
+log_classifer <- glm(target ~ ., data = training_set, family = "binomial")
+summary(log_classifer)
+```
+
+Above summary says there are very few independent variables are significant having p-value less than 0.05
+Some of the significant Independent Variables are 
+
+- nox
+- age
+- rad
+- tax
+- ptratio
+
+We will build another logistic classifier with these significant variables and compare the results with classifier with all variables. 
+
+Lets use the orginal logistic classifer to predict the test dataset. We will also plot an ROC graph and figure the best fit threshold for the classifier. 
+
+```{r}
+result = predict(log_classifer, newdata = test_set, type = "response")
+test_set$scored.probability1 <- result
+
+plot.roc(test_set$target, test_set$scored.probability1,
+main="Optimal threshold for Classifer-1", percent=TRUE, of="thresholds", # compute AUC (of threshold)
+thresholds="best", # select the (best) threshold
+print.auc = TRUE,
+print.thres="best") 
+
+```
+
+From the above ROC graph, we got the optimal threshold is 0.5. Lets use this threshold and print the confusion matrix and evaluate the preformance metric such as accuracy, Precision, Sensitivity. 
+
+```{r}
+test_set$prediction1 <- ifelse(test_set$scored.probability1 > 0.5, 1, 0)
+confusionMatrix(as.factor(test_set$prediction1),as.factor( test_set$target))
+```
+
+This classifer gives 
+
+ - 95% Accuracy
+ - 100% Precision with No Type-1 Error(False Positive Error)
+ - 91% Sensitivity with minor Type-2 Error(False negative Error)
+ - 98.6% AUC(Area under Curve)
+
+
+Lets build a classifer with significant independent variables. 
+
+```{r}
+log_classifer1 <- glm(target ~ nox + age + rad + tax + ptratio, data = training_set, family = "binomial")
+summary(log_classifer1)
+```
+
+The AIC value is reduced, but the residual deviance increased a bit compared to the previous model. Lets test predict and evaluate the preformance metrics of the new classifer. 
+
+```{r}
+result = predict(log_classifer1, newdata = test_set, type = "response")
+test_set$scored.probability2 <- result
+
+plot.roc(test_set$target, test_set$scored.probability2,
+main="Optimal threshold for Classifer-2", percent=TRUE, of="thresholds", # compute AUC (of threshold)
+thresholds="best", # select the (best) threshold
+print.auc = TRUE, 
+print.thres="best") 
+
+```
+
+
+
+The optimal threshold of the new model is 0.4. We will predict the target label and print the confusion matrix.  
+
+
+```{r}
+test_set$prediction1 <- ifelse(test_set$scored.probability1 > 0.4, 1, 0)
+confusionMatrix(as.factor(test_set$prediction1),as.factor( test_set$target))
+```
+
+This model gives 
+
+ - 94% Accuracy 
+ - 100% Precision
+ - 88% Sensitivity 
+ - 98.1% AUC( Area under Curve)
+
+# Selection of the Best Model
+
+Based on performance metrics such as AUC, Accuracy, Precisoion and Sensitiviy, the first classifer seems to be giving better results. We will use the first classifer and the threshold = 0.5 to predict for the evaluation data
+
+
+```{r}
+df_eval <- read.csv("https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Classification%20Project/crime-evaluation-data_modified.csv")
+
+result = predict(log_classifer, newdata = df_eval, type = "response")
+df_eval$scored.probability <- result
+df_eval$prediction <- ifelse(result > 0.5, 1, 0)
+
+kable(df_eval)
+
+```
