@@ -11,6 +11,7 @@ library(pROC)
 library(dplyr)
 library(class)  #knn
 library(caret)   # confusion metric
+library(knitr)
 ```
 
 
@@ -19,10 +20,10 @@ library(caret)   # confusion metric
 
 ```{r}
 
-training <- read.csv( "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_train.csv")[-1]
-test_set <- read.csv("C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_test.csv")[-1]
+training <- read.csv( "https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_train.csv")[-1]
+test_set <- read.csv("https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_test.csv")[-1]
 
-df_eval <- read.csv( "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_eval.csv")[-1]
+df_eval <- read.csv( "https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_eval.csv")[-1]
 
 ```
 
@@ -31,7 +32,7 @@ The dataset is imbalanced as we are seeing more number of negative classes than 
 We will set 0 means "No Car crash" and 1 means "Car cash"
 
 Considering a classifer model like this, by looking at only accuracy may not give a clear picture of model goodness. I'm assuming predicting a case whether a person whether will involve into a car crash is crucial.
-As we have two types of errors( Type1(False positive) and Type2(False Negative)), we should always avoid both of these error. However in this case, we should focus more on reducing Type2(False Negative). That is predicting Negative when it is really positive so that we loss an opportunity to save a person's life and as well as claim amounts. We know sensitivity is a measure of False negative rate. So we will focuss on the sensitivity than the precision or accuracy. 
+As we have two types of errors( Type1(False positive) and Type2(False Negative)), we should always avoid both of these error. However in this case, we should focus more on reducing Type2(False Negative). That is predicting Negative when it is really positive so that we loss an opportunity to save a person's life and as well as claim amounts. We know sensitivity/Recall is a measure of False negative rate. So we will focus on the sensitivity than the precision or accuracy. 
 
 Another metrics we will focuss is AUC(Area under curve measure) while comparing different classifers. 
 
@@ -53,7 +54,6 @@ lr_pred_prob=predict(log_classifer,newdata = test_set, type ="response" )
 # consider the threshold of the linear regression classifer as 0.5
 lr_pred_class  <- ifelse(lr_pred_prob > 0.5, 1, 0)
 
-head(test_set)
 roc <- roc(test_set$TARGET_FLAG, lr_pred_class)
 roc$auc
 
@@ -123,5 +123,7 @@ df_classifer_pred=predict(nb_model,newdata = df_eval, type ="class")
 df_eval$TARGET_FLAG <- df_classifer_pred
 
 write.csv(df_eval, "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\eval_results.csv")
+
+kable(df_eval)
 
 ```
