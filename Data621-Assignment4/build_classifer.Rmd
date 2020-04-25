@@ -1,0 +1,109 @@
+---
+title: "Data assignment 4 : Build_Classifer for Insurance data "
+author: "Charls Joseph"
+date: "April 25, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Building Models
+
+
+```{r}
+
+training <- read.csv( "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_train.csv")[-1]
+test_set <- read.csv("C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_test.csv")[-1]
+
+df_eval <- read.csv( "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_eval.csv")[-1]
+
+```
+
+
+```{r}
+table(training$TARGET_FLAG)
+
+```
+
+
+```{r}
+head(training)
+
+log_classifer <- glm(TARGET_FLAG ~ ., data=training[,-2], family = "binomial")
+lr_pred_prob=predict(log_classifer,newdata = test_set, type ="response" )
+# consider the threshold of the linear regression classifer as 0.5
+lr_pred_class  <- ifelse(lr_pred_prob > 0.5, 1, 0)
+
+head(test_set)
+roc <- roc(test_set$TARGET_FLAG, lr_pred_class)
+roc$auc
+
+plot.roc(roc,
+main="Logistic Regression | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
+thresholds="best", # select the (best) threshold
+print.auc = TRUE, 
+print.thres="best") 
+
+predict.lr_result <- confusionMatrix(as.factor(lr_pred_class), as.factor(test_set$TARGET_FLAG), positive = "1")
+predict.lr_result
+
+```
+
+```{r}
+
+trainData1 = training[,-c(1,2)]
+testData1 = test_set[,-c(1,2)]
+
+train_lbls <- training$TARGET_FLAG
+test_lbls <- test_set$TARGET_FLAG
+
+knn_model <- knn(train = trainData1, test = testData1, cl= train_lbls,k = 7, prob = TRUE)
+
+roc <- roc(test_set$TARGET_FLAG, attributes(knn_model)$prob)
+roc$auc
+plot.roc(roc,
+main="KNN Classifer | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
+thresholds="best", # select the (best) threshold
+print.auc = TRUE, 
+print.thres="best") 
+
+predict.knn_result <- confusionMatrix(knn_model, as.factor(test_set$TARGET_FLAG), positive = "1")
+predict.knn_result
+
+```
+
+```{r}
+library(e1071)
+
+nb_model=naiveBayes(as.factor(TARGET_FLAG) ~ ., data=training[,-2])
+
+nm_pred_prob=predict(nb_model,newdata = test_set, type =  "raw" )
+nm_pred_class=predict(nb_model,newdata = test_set, type ="class")
+
+roc <- roc(as.factor(test_set$TARGET_FLAG), nm_pred_prob[,2])
+roc$auc
+plot.roc(roc,
+main="Naive Bayes | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
+thresholds="best", # select the (best) threshold
+print.auc = TRUE, 
+print.thres="best") 
+
+predict.nb_result <- confusionMatrix(nm_pred_class, as.factor(test_set$TARGET_FLAG), positive = "1")
+predict.nb_result
+
+```
+
+# Predicting the evaluation dataset 
+
+```{r}
+
+df_classifer_pred=predict(nb_model,newdata = df_eval, type ="class")
+df_eval$TARGET_FLAG <- df_classifer_pred
+
+write.csv(df_eval, "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\eval_results.csv")
+
+
+```
