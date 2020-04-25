@@ -1,5 +1,5 @@
 ---
-title: "Data assignment 4 : Build_Classifer for Insurance data "
+title: "Data assignment 4 : Building Classifer for Insurance data "
 author: "Charls Joseph"
 date: "April 25, 2020"
 output: html_document
@@ -7,6 +7,10 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(pROC)
+library(dplyr)
+library(class)  #knn
+library(caret)   # confusion metric
 ```
 
 
@@ -22,15 +26,27 @@ df_eval <- read.csv( "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignmen
 
 ```
 
+The dataset is imbalanced as we are seeing more number of negative classes than the positive classes. 
+
+We will set 0 means "No Car crash" and 1 means "Car cash"
+
+Considering a classifer model like this, by looking at only accuracy may not give a clear picture of model goodness. I'm assuming predicting a case whether a person whether will involve into a car crash is crucial.
+As we have two types of errors( Type1(False positive) and Type2(False Negative)), we should always avoid both of these error. However in this case, we should focus more on reducing Type2(False Negative). That is predicting Negative when it is really positive so that we loss an opportunity to save a person's life and as well as claim amounts. We know sensitivity is a measure of False negative rate. So we will focuss on the sensitivity than the precision or accuracy. 
+
+Another metrics we will focuss is AUC(Area under curve measure) while comparing different classifers. 
+
+
 
 ```{r}
 table(training$TARGET_FLAG)
 
 ```
 
+We will perform 3 classifers. They are Logistic regression, KNN and Naive Bayes models. 
+
+# Logistic Regression
 
 ```{r}
-head(training)
 
 log_classifer <- glm(TARGET_FLAG ~ ., data=training[,-2], family = "binomial")
 lr_pred_prob=predict(log_classifer,newdata = test_set, type ="response" )
@@ -48,9 +64,10 @@ print.auc = TRUE,
 print.thres="best") 
 
 predict.lr_result <- confusionMatrix(as.factor(lr_pred_class), as.factor(test_set$TARGET_FLAG), positive = "1")
-predict.lr_result
 
 ```
+
+# KNN model
 
 ```{r}
 
@@ -71,9 +88,10 @@ print.auc = TRUE,
 print.thres="best") 
 
 predict.knn_result <- confusionMatrix(knn_model, as.factor(test_set$TARGET_FLAG), positive = "1")
-predict.knn_result
 
 ```
+
+# Naive Bayes
 
 ```{r}
 library(e1071)
@@ -92,11 +110,12 @@ print.auc = TRUE,
 print.thres="best") 
 
 predict.nb_result <- confusionMatrix(nm_pred_class, as.factor(test_set$TARGET_FLAG), positive = "1")
-predict.nb_result
 
 ```
 
 # Predicting the evaluation dataset 
+
+As we are seeing above Naive Bayes gives a better AUC, Sensitivity and Accuracy. Hence we will use naive bayes model to predict the evaluation data set. 
 
 ```{r}
 
@@ -104,6 +123,5 @@ df_classifer_pred=predict(nb_model,newdata = df_eval, type ="class")
 df_eval$TARGET_FLAG <- df_classifer_pred
 
 write.csv(df_eval, "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\eval_results.csv")
-
 
 ```
