@@ -54,17 +54,17 @@ lr_pred_prob=predict(log_classifer,newdata = test_set, type ="response" )
 # consider the threshold of the linear regression classifer as 0.5
 lr_pred_class  <- ifelse(lr_pred_prob > 0.5, 1, 0)
 
-roc <- roc(test_set$TARGET_FLAG, lr_pred_class)
-roc$auc
+roc1 <- roc(test_set$TARGET_FLAG, lr_pred_class)
+roc1$auc
 
-plot.roc(roc,
+plot.roc(roc1,
 main="Logistic Regression | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
 thresholds="best", # select the (best) threshold
 print.auc = TRUE, 
 print.thres="best") 
 
 predict.lr_result <- confusionMatrix(as.factor(lr_pred_class), as.factor(test_set$TARGET_FLAG), positive = "1")
-
+predict.lr_result
 ```
 
 # KNN model
@@ -79,16 +79,16 @@ test_lbls <- test_set$TARGET_FLAG
 
 knn_model <- knn(train = trainData1, test = testData1, cl= train_lbls,k = 7, prob = TRUE)
 
-roc <- roc(test_set$TARGET_FLAG, attributes(knn_model)$prob)
-roc$auc
-plot.roc(roc,
+roc2 <- roc(test_set$TARGET_FLAG, attributes(knn_model)$prob)
+roc2$auc
+plot.roc(roc2,
 main="KNN Classifer | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
 thresholds="best", # select the (best) threshold
 print.auc = TRUE, 
 print.thres="best") 
 
 predict.knn_result <- confusionMatrix(knn_model, as.factor(test_set$TARGET_FLAG), positive = "1")
-
+predict.knn_result
 ```
 
 # Naive Bayes
@@ -101,17 +101,35 @@ nb_model=naiveBayes(as.factor(TARGET_FLAG) ~ ., data=training[,-2])
 nm_pred_prob=predict(nb_model,newdata = test_set, type =  "raw" )
 nm_pred_class=predict(nb_model,newdata = test_set, type ="class")
 
-roc <- roc(as.factor(test_set$TARGET_FLAG), nm_pred_prob[,2])
-roc$auc
-plot.roc(roc,
+roc3 <- roc(as.factor(test_set$TARGET_FLAG), nm_pred_prob[,2])
+roc3$auc
+plot.roc(roc3,
 main="Naive Bayes | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
 thresholds="best", # select the (best) threshold
 print.auc = TRUE, 
 print.thres="best") 
 
 predict.nb_result <- confusionMatrix(nm_pred_class, as.factor(test_set$TARGET_FLAG), positive = "1")
+predict.nb_result
+```
+
+# ploting ROC of all models 
+
+```{r}
+plot.roc(roc1, print.auc = TRUE, 
+                 col = "red") 
+plot.roc(roc2 , add = TRUE,print.auc = TRUE, 
+                 col = "green", print.auc.y = .4) 
+
+plot.roc(roc3 , add = TRUE,print.auc = TRUE, 
+                 col = "blue", print.auc.y = .6) 
+
+legend("bottomright", legend=c("Model-1 - Logistic regression", "Model-2 - Knn", "Model-3 - Naive Bayes"),
+col=c("red", "green", "blue"), lwd=2)
+
 
 ```
+
 
 # Predicting the evaluation dataset 
 

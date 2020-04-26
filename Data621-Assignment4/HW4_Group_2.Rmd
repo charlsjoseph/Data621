@@ -1,0 +1,441 @@
+---
+title: "CUNY DATA 621 HW4: Insurance"
+author: "Group 2: Elina Azrilyan, Charls Joseph, Mary Anna Kivenson, Sunny Mehta, Vinayak Patel"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: pdf_document
+classoption: landscape
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE, warning=FALSE}
+options(tinytex.verbose = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
+options("scipen" = 10)
+
+library(tidyverse)
+library(ggplot2)
+require(gridExtra)
+library(corrplot)
+library(VIM)
+library(caret)
+library(mice)
+library(pROC)
+library(class)  #knn
+library(knitr)
+library(MASS)
+
+```
+
+
+## Data Exploration
+
+#### Read Data
+
+Here, we read the training dataset into a dataframe.
+
+```{r}
+df <- read.csv("https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Insurance%20Model/insurance_training_data.csv")[-1]
+head(df)
+df_eval <- read.csv("https://raw.githubusercontent.com/mkivenson/Business-Analytics-Data-Mining/master/Insurance%20Model/insurance-evaluation-data.csv")[-1]
+head(df_eval)
+```
+
+
+```{r}
+df$INCOME <- as.numeric(df$INCOME)
+df$HOME_VAL <- as.numeric(df$HOME_VAL)
+df$BLUEBOOK <- as.numeric(df$BLUEBOOK)
+df$OLDCLAIM <- as.numeric(df$OLDCLAIM)
+
+df_eval$INCOME <- as.numeric(df_eval$INCOME)
+df_eval$HOME_VAL <- as.numeric(df_eval$HOME_VAL)
+df_eval$BLUEBOOK <- as.numeric(df_eval$BLUEBOOK)
+df_eval$OLDCLAIM <- as.numeric(df_eval$OLDCLAIM)
+```
+
+
+#### Summary
+
+First, we take a look at a summary of the data. 
+
+- There are missing values in the AGE, YOJ, and CAR_AGE columns that must be imputed.
+- There are multiple categorical variables that will have to be encoded (`MSTATUS`, `HOME_VAL`, `SEX`, `EDUCTION`, `JOB`, `CAR_USE`, `RED_CAR`, `REVOKED`, `URBANICITY`)
+
+```{r}
+summary(df)
+```
+
+
+#### Distributions
+
+Taking a look a the distributions of numerical variables, the following items observations are revealed:
+
+* Most of the variables are not normally distributed - features will be centered and scaled as part of the preprocessing.
+* OLDCLAIM values (past payouts) are mostly 0
+
+```{r warning=FALSE}
+grid.arrange(ggplot(df, aes(TARGET_FLAG)) + geom_histogram(binwidth = .5),
+             ggplot(df, aes(TARGET_AMT)) + geom_histogram(binwidth = 1000),
+             ggplot(df, aes(KIDSDRIV)) + geom_histogram(binwidth = .1),
+             ggplot(df, aes(AGE)) + geom_histogram(binwidth = 10),
+             ggplot(df, aes(HOMEKIDS)) + geom_histogram(binwidth = .5),
+             ggplot(df, aes(YOJ)) + geom_histogram(binwidth = 1),
+             ggplot(df, aes(INCOME)) + geom_histogram(binwidth = 500),
+             ggplot(df, aes(HOME_VAL)) + geom_histogram(binwidth = 500),
+             ggplot(df, aes(TRAVTIME)) + geom_histogram(binwidth = 10),
+             ggplot(df, aes(BLUEBOOK)) + geom_histogram(binwidth = 200),
+             ggplot(df, aes(TIF)) + geom_histogram(binwidth = 5),
+             ggplot(df, aes(OLDCLAIM)) + geom_histogram(binwidth = 100),
+             ggplot(df, aes(MVR_PTS)) + geom_histogram(binwidth = 2),
+             ggplot(df, aes(CAR_AGE)) + geom_histogram(binwidth = 2),
+             ncol=4)
+```
+
+
+#### Boxplots
+
+For the classification task, it might be insightful to compare distributions of numerical features for the levels of `TARGET_FLAG`. It appears that the features that differ the most between levels of TARGET_FLAG are `HOME_VAL`, `OLDCLAIM`, and `MVR_PTS`.
+
+```{r warning=FALSE, fig.width= 10}
+grid.arrange(ggplot(df, aes(x = TARGET_FLAG, y = KIDSDRIV, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = AGE, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = HOMEKIDS, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = YOJ, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = INCOME, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = HOME_VAL, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = TRAVTIME, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = BLUEBOOK, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = TIF, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = OLDCLAIM, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = MVR_PTS, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ggplot(df, aes(x = TARGET_FLAG, y = CAR_AGE, fill = as.factor(TARGET_FLAG))) + geom_boxplot() + theme(legend.position = "none") ,
+             ncol=4)
+```
+
+#### Correlations
+
+Looking at a correlation plot of numeric variables, it is evident that there is some collinearity in the dataset.
+
+- `HOMEKIDS` AND `AGE` have a negative correlation
+- `HOMEKIDS` and `KIDSDRIV` have a positive correlation
+- `CLM_FREQ` AND `OLDCLAIM` have a strong negative correlation
+- `MVR_PTS` and `OLDCLAIM` have a negative correlation
+- `MVR_PTS` and `CLM_FREQ` have a negative correlation
+
+```{r}
+corrplot(cor(df[,sapply(df, is.numeric)], use = "complete.obs"), method="color", type="lower", tl.col = "black", tl.srt = 5)
+```
+
+
+## Data Preparation
+
+Based on information gathered by performing exploratory data analysis, we must impute missing values, encode categorical variables, and apply feature transformations. 
+
+#### Missing Values
+
+We will use Multivariable Imputation by Chained Equations (mice) to fill the missing variables.
+
+```{r}
+aggr(df[,sapply(df, is.numeric)], col=c('navyblue','red'), numbers=TRUE, sortVars=TRUE, labels=names(df), cex.axis=.7, gap=3, ylab=c("Histogram of missing data","Pattern"))
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE, cache = T}
+tempData <- mice(df,m=5,maxit=50,meth='pmm',seed=500)
+df <- complete(tempData,1)
+```
+
+
+#### Encoding
+
+The following categorical features have to be encoded: `MSTATUS`, `HOME_VAL`, `SEX`, `EDUCTION`, `JOB`, `CAR_USE`, `RED_CAR`, `REVOKED`, and `URBANICITY`. To do this, the `dummyVars` function from caret will be used. 
+
+```{r}
+dmy <- dummyVars(" ~ .", data = df)
+df <- data.frame(predict(dmy, newdata = df))
+
+df_eval <- data.frame(predict(dmy, newdata = df_eval))
+
+```
+
+
+
+Taking a look at the new columns in the dataframe, it is clear that some columns are unneccesary. Since each categorical feature requires one less column than categories, we will drop one dummy column for each feature. 
+
+```{r}
+names(df)
+```
+
+
+```{r}
+drop <-  c("PARENT1.No", "MSTATUS.z_No", "SEX.M", "EDUCATION.z_High.School", "JOB.", "CAR_USE.Commercial", "CAR_TYPE.Pickup", "RED_CAR.no", "REVOKED.No", "URBANICITY.z_Highly.Rural..Rural")
+df = df[,!(names(df) %in% drop)]
+
+drop_eval <-  c("TARGET_FLAGFALSE" ,"TARGET_FLAGTRUE" , "TARGET_AMTFALSE", "TARGET_AMTTRUE", "PARENT1.No", "MSTATUS.z_No", "SEX.M", "EDUCATION.z_High.School", "JOB.", "CAR_USE.Commercial", "CAR_TYPE.Pickup", "RED_CAR.no", "REVOKED.No", "URBANICITY.z_Highly.Rural..Rural")
+df = df[,!(names(df) %in% drop)]
+# drop it for evaluation dataset too 
+df_eval = df_eval[,!(names(df_eval) %in% drop_eval)]
+```
+
+
+
+#### Transformations and Output
+
+For the linear regression models, performance will be evaluated using R-squared and RMSE. However, for the binary logistic regression model, performance will also be measured based on test data accuracy. To accomplish this, we will create the following datasets. Train and test sets will be transformed separately. 
+
+- insurance_tf: Full dataset, transformed
+- insurance_tf_train: 80% split train dataset, transformed
+- insurance_tf_test: 20% split test dataset, transformed
+
+
+```{r}
+# set.seed(42)
+# inTrain <- sample(floor(0.8 * nrow(df)))
+# 
+# training <- df[inTrain, -(1:2)]
+# test <- df[-inTrain, -(1:2)]
+# train_y <- df[inTrain, (1:2)]
+# test_y <- df[-inTrain, (1:2)]
+# 
+# preProcValues <- preProcess(training, method = c("center", "scale"))
+# 
+# insurance_tf_train <- predict(preProcValues, training) %>% cbind(train_y)
+# insurance_tf_test <- predict(preProcValues, test) %>% cbind(test_y)
+# 
+# preProcValues_all <- preProcess(df[, -(1:2)], method = c("center", "scale"))
+# insurance_tf <- predict(preProcValues_all, df[, -(1:2)]) %>% cbind(df[, (1:2)])
+
+set.seed(42)
+inTrain <- sample(floor(0.8 * nrow(df)))
+insurance_tf_train <- df[inTrain,]
+insurance_tf_test <- df[-inTrain,] 
+
+#write.csv(insurance_tf_train,"C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_train.csv")
+
+#write.csv(insurance_tf_test,"C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_test.csv")
+
+
+#write.csv(df_eval, "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\insurance_tf_eval.csv")
+
+```
+
+
+```{r}
+#write.csv(insurance_tf, "C:\\Users\\mkive\\Documents\\GitHub\\Business-Analytics-Data-Mining\\Business-Analytics-Data-Mining\\Insurance Model\\insurance_tf.csv")
+#write.csv(insurance_tf_train, "C:\\Users\\mkive\\Documents\\GitHub\\Business-Analytics-Data-Mining\\Business-Analytics-Data-Mining\\Insurance Model\\insurance_tf_train.csv")
+#write.csv(insurance_tf_test, "C:\\Users\\mkive\\Documents\\GitHub\\Business-Analytics-Data-Mining\\Business-Analytics-Data-Mining\\Insurance Model\\insurance_tf_test.csv")
+```
+
+# Building Models
+
+Reading in cleaned up output dataset:
+
+```{r}
+ins_df <- read.csv( "https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_train.csv")[-1]
+test_set <- read.csv("https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_test.csv")[-1]
+df_eval <- read.csv( "https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_eval.csv")[-1]
+```
+
+### Multiple Linear Regression
+
+#### Model 1
+
+We will try to use all the variables for our initial regression model, to identify which appear to show significance.
+
+```{r}
+ins_df$TARGET_FLAG <- NULL
+reg1<-lm(formula = TARGET_AMT ~ ., data = ins_df)
+summary(reg1)
+```
+
+There are a lot of variable with low signifiance and high p-value, so we will try to only leave the variable with high significance for the next model.
+
+#### Model 2
+
+```{r}
+reg1_1<-lm(formula = TARGET_AMT ~ KIDSDRIV + PARENT1.Yes + MSTATUS.Yes + TRAVTIME + CAR_USE.Private + TIF + CAR_TYPE.Minivan + REVOKED.Yes + MVR_PTS + CAR_AGE + URBANICITY.Highly.Urban..Urban, data = ins_df)
+summary(reg1_1)
+```
+
+We can see improvements in R-Squared value after we narrowed the model to highly significant variables. It is however still rather low. Only 7% of the variation in the data can be explained by this model. 
+
+We will now use this regression model to predict values for the evaluation data set. 
+```{r}
+reg_pred <- predict(reg1_1, df_eval, type="response",se.fit=FALSE)
+# se.fit=FALSE
+df_eval$TARGET_AMT <- reg_pred
+
+#write.csv(df_eval,"eval_results.csv", row.names = FALSE)
+```
+
+# Classification Models 
+
+```{r}
+insurance_tf_train <- read.csv( "https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_train.csv")[-1]
+insurance_tf_test <- read.csv("https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_test.csv")[-1]
+insurance_tf_eval <- read.csv( "https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_eval.csv")
+```
+
+
+## Linear logistic regression
+
+### Model 1 - All binary variables with TARGET_FLAG. 
+
+```{r m1, echo=FALSE, eval=TRUE}
+model1 <- lm(TARGET_FLAG ~.  ,data=insurance_tf_train, family= "binomial")
+
+summary(model1)
+```
+
+### Model 2 - All significant variables with TARGET_FLAG. 
+
+```{r m2, echo=FALSE, eval=TRUE}
+model2 <- lm(TARGET_FLAG ~ . -AGE -HOMEKIDS -INCOME -EDUCATION..High.School-JOB.Doctor-JOB.Manager-BLUEBOOK-CAR_TYPE.Van-RED_CAR.yes-CAR_AGE ,data=insurance_tf_train, family=binomial())
+
+summary(model2)
+```
+
+```{r m3, echo=FALSE, eval=TRUE}
+model3 <- lm(TARGET_FLAG ~ . -AGE -HOMEKIDS -INCOME -EDUCATION..High.School-JOB.Doctor-JOB.Manager-BLUEBOOK-CAR_TYPE.Van-RED_CAR.yes-CAR_AGE-SEX.z_F-EDUCATION.PhD-CLM_FREQ-EDUCATION.Masters-JOB.Lawyer ,data=insurance_tf_train, family= "binomial")
+
+summary(model3)
+```
+
+## Model Selection
+
+```{r fig1, fig.height = 4, fig.width = 6, fig.align= 'center'}
+roc(TARGET_FLAG~model1$fitted.values, data = insurance_tf_train,plot = TRUE, main = "ROC CURVE", col= "blue",
+    percent=TRUE,
+    ci = TRUE, # compute AUC (of AUC by default)
+    print.auc = TRUE)
+
+```
+```{r fig2, fig.height = 4, fig.width = 6, fig.align= 'center'}
+roc(TARGET_FLAG~model2$fitted.values, data = insurance_tf_train,plot = TRUE, main = "ROC CURVE", col= "blue",
+    percent=TRUE,
+    ci = TRUE, # compute AUC (of AUC by default)
+    print.auc = TRUE)
+```
+
+```{r fig3, fig.height = 4, fig.width = 6, fig.align= 'center'}
+roc(TARGET_FLAG~model3$fitted.values, data = insurance_tf_train,plot = TRUE, main = "ROC CURVE", col= "blue",
+    percent=TRUE,
+    ci = TRUE, # compute AUC (of AUC by default)
+    print.auc = TRUE)
+```
+
+
+
+Based the fact that the area under the curve for model 2 and model 3 are virtually identical. I am going to select model2 Because Auc value is little bit higher than other.
+
+```{r}
+
+training <- read.csv( "https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_train.csv")[-1]
+test_set <- read.csv("https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_test.csv")[-1]
+
+df_eval <- read.csv( "https://raw.githubusercontent.com/charlsjoseph/Data621/master/Data621-Assignment4/insurance_tf_eval.csv")[-1]
+
+```
+
+# Further Classification Models
+
+The dataset is imbalanced as we are seeing more number of negative classes than the positive classes. 
+
+We will set 0 means "No Car crash" and 1 means "Car cash"
+
+Considering a classifer model like this, by looking at only accuracy may not give a clear picture of model goodness. I'm assuming predicting a case whether a person whether will involve into a car crash is crucial.
+As we have two types of errors( Type1(False positive) and Type2(False Negative)), we should always avoid both of these error. However in this case, we should focus more on reducing Type2(False Negative). That is predicting Negative when it is really positive so that we loss an opportunity to save a person's life and as well as claim amounts. We know sensitivity/Recall is a measure of False negative rate. So we will focus on the sensitivity than the precision or accuracy. 
+
+Another metrics we will focuss is AUC(Area under curve measure) while comparing different classifers. 
+
+
+
+```{r}
+table(training$TARGET_FLAG)
+
+```
+
+We will perform 3 classifers. They are Logistic regression, KNN and Naive Bayes models. 
+
+# Logistic Regression
+
+```{r}
+
+log_classifer <- glm(TARGET_FLAG ~ ., data=training[,-2], family = "binomial")
+lr_pred_prob=predict(log_classifer,newdata = test_set, type ="response" )
+# consider the threshold of the linear regression classifer as 0.5
+lr_pred_class  <- ifelse(lr_pred_prob > 0.5, 1, 0)
+
+roc <- roc(test_set$TARGET_FLAG, lr_pred_class)
+roc$auc
+
+plot.roc(roc,
+main="Logistic Regression | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
+thresholds="best", # select the (best) threshold
+print.auc = TRUE, 
+print.thres="best") 
+
+predict.lr_result <- confusionMatrix(as.factor(lr_pred_class), as.factor(test_set$TARGET_FLAG), positive = "1")
+
+```
+
+# KNN model
+
+```{r}
+
+trainData1 = training[,-c(1,2)]
+testData1 = test_set[,-c(1,2)]
+
+train_lbls <- training$TARGET_FLAG
+test_lbls <- test_set$TARGET_FLAG
+
+knn_model <- knn(train = trainData1, test = testData1, cl= train_lbls,k = 7, prob = TRUE)
+
+roc <- roc(test_set$TARGET_FLAG, attributes(knn_model)$prob)
+roc$auc
+plot.roc(roc,
+main="KNN Classifer | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
+thresholds="best", # select the (best) threshold
+print.auc = TRUE, 
+print.thres="best") 
+
+predict.knn_result <- confusionMatrix(knn_model, as.factor(test_set$TARGET_FLAG), positive = "1")
+
+```
+
+# Naive Bayes
+
+```{r}
+library(e1071)
+
+nb_model=naiveBayes(as.factor(TARGET_FLAG) ~ ., data=training[,-2])
+
+nm_pred_prob=predict(nb_model,newdata = test_set, type =  "raw" )
+nm_pred_class=predict(nb_model,newdata = test_set, type ="class")
+
+roc <- roc(as.factor(test_set$TARGET_FLAG), nm_pred_prob[,2])
+roc$auc
+plot.roc(roc,
+main="Naive Bayes | ROC Curve", percent=TRUE, of="thresholds", # compute AUC (of threshold)
+thresholds="best", # select the (best) threshold
+print.auc = TRUE, 
+print.thres="best") 
+
+predict.nb_result <- confusionMatrix(nm_pred_class, as.factor(test_set$TARGET_FLAG), positive = "1")
+
+```
+
+# Predicting the evaluation dataset 
+
+As we are seeing above Naive Bayes gives a better AUC, Sensitivity and Accuracy. Hence we will use naive bayes model to predict the evaluation data set. 
+
+```{r}
+
+df_classifer_pred=predict(nb_model,newdata = df_eval, type ="class")
+df_eval$TARGET_FLAG <- df_classifer_pred
+
+#write.csv(df_eval, "C:\\Users\\Charls\\Documents\\CunyMSDS\\Data621\\assignments\\data621\\Data621-Assignment4\\eval_results.csv")
+
+kable(df_eval)
+
+```
